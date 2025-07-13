@@ -1,78 +1,145 @@
-# Smart Diary
+# 🌟 Smart Diary
 
-A Flutter app for creating and sharing diary entries with family and friends. Features include real-time collaboration, voice-to-text input, Markdown formatting, and mood tracking.
+A beautiful, modern diary application built with Flutter that allows users to create shared diaries, write entries with Markdown support, and collaborate with others in real-time.
 
-## Features
+## ✨ Features
 
-- 🔐 **Authentication**: Email/password sign-up and login
-- 📚 **Shared Diaries**: Create or join diaries with family and friends
-- ✍️ **Rich Text Entries**: Markdown support for formatted diary entries
-- 🎤 **Voice-to-Text**: Convert speech to text for easy entry creation
-- 😊 **Mood Tracking**: Tag entries with your current mood
-- 🏷️ **Tags & Filtering**: Organize and filter entries with custom tags
-- 🔄 **Real-time Sync**: See updates from other diary members instantly
-- 📱 **Offline Support**: Access your diaries even without internet
+### 🔐 Authentication
 
-## Getting Started
+- **Firebase Authentication** with email/password
+- Secure user registration and login
+- Password reset functionality
+
+### 📖 Shared Diaries
+
+- **Create personal diaries** or collaborate with others
+- **Join diaries** using unique diary codes
+- **Real-time synchronization** across all devices
+- **Member management** with proper permissions
+
+### ✍️ Rich Entry Creation
+
+- **Markdown support** for formatted text
+- **Mood tracking** with intuitive emoji selection
+- **Tag system** for easy organization and filtering
+- **Real-time preview** of formatted content
+- **Offline support** with automatic sync when online
+
+### 🎨 Modern UI/UX
+
+- **Apple-inspired design** with clean, minimal interface
+- **Dark/Light theme support** with pitch-black dark mode
+- **Smooth animations** and seamless transitions
+- **Responsive design** that works on all screen sizes
+- **Intuitive navigation** with floating action buttons
+
+### 🔍 Advanced Features
+
+- **Real-time filtering** by tags and moods
+- **Search functionality** across all entries
+- **Entry management** with edit and delete options
+- **Diary management** with owner controls
+- **Automatic timestamps** and user attribution
+
+## 📱 Screenshots
+
+### 🌙 Dark Mode
+
+| Login Screen | Home Screen |
+|:---:|:---:|
+| ![Dark Login](screenshots/dark_login.jpg) | ![Dark Home](screenshots/dark_home.jpg) |
+
+| Diary Entries | New Entry |
+|:---:|:---:|
+![Dark Diary](screenshots/dark_diary.jpg) | ![Dark Entry](screenshots/dark_entry.jpg) |
+
+### ☀️ Light Mode
+
+| Login Screen | Home Screen |
+|:---:|:---:|
+| ![Light Login](screenshots/light_login.jpg) | ![Light Home](screenshots/light_home.jpg) |
+
+| Diary Entries | New Entry |
+|:---:|:---:|
+| ![Light Diary](screenshots/light_diary.jpg) | ![Light Entry](screenshots/light_entry.jpg) |
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Flutter SDK (latest stable version)
-- Firebase project
-- Android Studio/VS Code with Flutter extensions
-
-### Firebase Setup
-
-1. **Create a Firebase Project**
-   - Go to [Firebase Console](https://console.firebase.google.com/)
-   - Create a new project named "smart-diary"
-
-2. **Configure Authentication**
-   - Enable Email/Password authentication in Firebase Console
-   - Go to Authentication > Sign-in method
-   - Enable "Email/Password"
-
-3. **Set up Firestore Database**
-   - Create a Firestore database in test mode
-   - Deploy the security rules from `firestore.rules`
-
-4. **Add Your Apps**
-   - **Android**: Add Android app with package name `com.example.echo`
-     - Download `google-services.json` and place in `android/app/`
-   - **iOS**: Add iOS app with bundle ID `com.example.echo`
-     - Download `GoogleService-Info.plist` and place in `ios/Runner/`
-
-5. **Update Firebase Configuration**
-   - Replace the placeholder values in `lib/firebase_options.dart` with your actual Firebase config
-   - You can get these values from your Firebase project settings
+- Flutter SDK (>=3.0.0)
+- Dart SDK (>=3.0.0)
+- Firebase project setup
+- Android Studio / VS Code
+- Git
 
 ### Installation
 
-1. **Clone and Install Dependencies**
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/CrayFish0/echo.git
+   cd echo
+   ```
+
+2. **Install dependencies**
+
    ```bash
    flutter pub get
    ```
 
-2. **Run the App**
+3. **Firebase Setup**
+   - Create a new Firebase project at [Firebase Console](https://console.firebase.google.com/)
+   - Enable Authentication (Email/Password)
+   - Create Firestore Database
+   - Download configuration files:
+     - `google-services.json` → `android/app/`
+     - `GoogleService-Info.plist` → `ios/Runner/`
+
+4. **Configure Firestore Security Rules**
+
+   ```javascript
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{userId} {
+         allow read, write: if request.auth != null && request.auth.uid == userId;
+       }
+       
+       match /diaries/{diaryId} {
+         allow read, write: if request.auth != null && 
+           request.auth.uid in resource.data.members;
+         
+         match /entries/{entryId} {
+           allow read, write: if request.auth != null && 
+             request.auth.uid in get(/databases/$(database)/documents/diaries/$(diaryId)).data.members;
+         }
+       }
+     }
+   }
+   ```
+
+5. **Run the app**
+
    ```bash
    flutter run
    ```
 
-## Project Structure
+## 🏗️ Project Structure
 
 ```
 lib/
-├── models/           # Data models
-│   ├── user_model.dart
+├── main.dart                 # App entry point
+├── firebase_options.dart     # Firebase configuration
+├── models/                   # Data models
 │   ├── diary_model.dart
-│   └── entry_model.dart
-├── providers/        # State management
+│   ├── diary_entry_model.dart
+│   └── user_model.dart
+├── providers/                # State management
 │   ├── auth_provider.dart
-│   └── diary_provider.dart
-├── services/         # Business logic
-│   ├── auth_service.dart
-│   └── firestore_service.dart
-├── screens/          # UI screens
+│   ├── diary_provider.dart
+│   └── theme_provider.dart
+├── screens/                  # UI screens
 │   ├── auth/
 │   │   ├── login_screen.dart
 │   │   └── register_screen.dart
@@ -80,69 +147,71 @@ lib/
 │   │   ├── diary_screen.dart
 │   │   └── entry_editor_screen.dart
 │   └── home_screen.dart
-├── firebase_options.dart
-└── main.dart
+└── services/                 # Business logic
+    ├── auth_service.dart
+    └── firestore_service.dart
 ```
 
-## Usage
+## 🛠️ Technologies Used
 
-### Creating a Diary
+- **Flutter** - Cross-platform mobile framework
+- **Firebase Auth** - Authentication service
+- **Cloud Firestore** - NoSQL database
+- **Provider** - State management
+- **flutter_markdown** - Markdown rendering
+- **shared_preferences** - Local storage
+- **Material Design 3** - UI components
 
-1. Sign up or log in to your account
-2. Tap the "+" button on the home screen
-3. Enter a title and optional description
-4. Start adding entries!
+## 🎨 Design Philosophy
 
-### Joining a Diary
+Smart Diary follows Apple's Human Interface Guidelines with:
 
-1. Ask a diary member to share the diary ID with you
-2. Tap the group icon on the home screen
-3. Enter the diary ID and join
+- **Minimalist interface** focusing on content
+- **Consistent typography** and spacing
+- **Subtle animations** that enhance user experience
+- **Accessible design** with proper contrast ratios
+- **Responsive layout** adapting to different screen sizes
 
-### Writing Entries
+## 📋 Features Roadmap
 
-1. Open a diary and tap the "+" button
-2. Write your entry using Markdown formatting:
-   - `**bold text**`
-   - `*italic text*`
-   - `# Heading`
-   - `- List item`
-3. Use the microphone button for voice input
-4. Add tags and select your mood
-5. Preview your entry before saving
+- [ ] **Rich text editor** with formatting toolbar
+- [ ] **Image attachments** in diary entries
+- [ ] **Export functionality** (PDF, Markdown)
+- [ ] **Push notifications** for shared diary updates
+- [ ] **Advanced search** with filters
+- [ ] **Backup and restore** functionality
+- [ ] **Desktop app** support
+- [ ] **Encryption** for sensitive entries
 
-### Voice Input
+## 🤝 Contributing
 
-1. Tap the microphone button while writing an entry
-2. Speak clearly into your device
-3. The text will be automatically added to your entry
-
-## Firestore Security Rules
-
-The app uses these security rules to protect user data:
-
-- Users can only access diaries where they are members
-- Users can only edit/delete their own entries
-- All operations require authentication
-
-## Contributing
+We welcome contributions! Please follow these steps:
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## License
+### Development Guidelines
 
-This project is open source and available under the [MIT License](LICENSE).
+- Follow Flutter/Dart style guidelines
+- Write meaningful commit messages
+- Add tests for new features
+- Update documentation as needed
 
-## Support
+## 📄 License
 
-If you encounter any issues:
-1. Check the Firebase configuration
-2. Ensure all permissions are granted (microphone for voice input)
-3. Verify Firestore security rules are deployed
-4. Check the console for error messages
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Happy diary writing! 📖✨
+## 🙏 Acknowledgments
+
+- **Flutter Team** for the amazing framework
+- **Firebase** for backend services
+- **Material Design** for design inspiration
+
+---
+
+<div align="center">
+  <b>Built with ❤️ using Flutter</b>
+</div>
