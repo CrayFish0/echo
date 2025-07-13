@@ -1,4 +1,4 @@
-# 🌟 Smart Diary
+# 🌟 Echo
 
 A beautiful, modern diary application built with Flutter that allows users to create shared diaries, write entries with Markdown support, and collaborate with others in real-time.
 
