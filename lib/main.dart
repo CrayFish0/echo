@@ -61,6 +61,17 @@ class MyApp extends StatelessWidget {
                 onSurfaceVariant: const Color(0xFF8E8E93),
               ),
 
+              // Page Transition Animations
+              pageTransitionsTheme: const PageTransitionsTheme(
+                builders: {
+                  TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+                  TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+                  TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+                  TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+                  TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+                },
+              ),
+
               // Card Theme
               cardTheme: CardTheme(
                 elevation: 0,
@@ -168,6 +179,17 @@ class MyApp extends StatelessWidget {
                 onSurface: Colors.black,
                 surfaceVariant: const Color(0xFFF2F2F7),
                 onSurfaceVariant: const Color(0xFF8E8E93),
+              ),
+
+              // Page Transition Animations
+              pageTransitionsTheme: const PageTransitionsTheme(
+                builders: {
+                  TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+                  TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+                  TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+                  TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+                  TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+                },
               ),
 
               // Card Theme
@@ -282,11 +304,27 @@ class AuthWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-        if (authProvider.isAuthenticated) {
-          return const HomeScreen();
-        } else {
-          return const LoginScreen();
-        }
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 500),
+          transitionBuilder: (Widget child, Animation<double> animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, 0.1),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                )),
+                child: child,
+              ),
+            );
+          },
+          child: authProvider.isAuthenticated
+              ? const HomeScreen(key: ValueKey('home'))
+              : const LoginScreen(key: ValueKey('login')),
+        );
       },
     );
   }

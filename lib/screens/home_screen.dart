@@ -13,10 +13,37 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
   @override
   void initState() {
     super.initState();
+
+    // Initialize animations
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0.0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final diaryProvider = Provider.of<DiaryProvider>(context, listen: false);
@@ -24,7 +51,16 @@ class _HomeScreenState extends State<HomeScreen> {
       if (authProvider.user != null) {
         diaryProvider.loadUserDiaries(authProvider.user!.uid);
       }
+
+      // Start animations
+      _animationController.forward();
     });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   @override
@@ -35,151 +71,36 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Good ${_getGreeting()}',
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: colorScheme.onSurface,
-                                letterSpacing: -0.3,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          authProvider.user?.displayName ?? 'User',
-                          style:
-                              Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Profile and theme button
-                  Row(
-                    children: [
-                      Consumer<ThemeProvider>(
-                        builder: (context, themeProvider, child) {
-                          return GestureDetector(
-                            onTap: themeProvider.toggleTheme,
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color:
-                                    colorScheme.surfaceVariant.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                themeProvider.isDarkMode
-                                    ? Icons.light_mode_rounded
-                                    : Icons.dark_mode_rounded,
-                                size: 22,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      GestureDetector(
-                        onTap: () {
-                          _showProfileMenu(context);
-                        },
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                colorScheme.primary,
-                                colorScheme.primary.withOpacity(0.7),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: Text(
-                              (authProvider.user?.displayName ?? 'U')[0]
-                                  .toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: Column(
+              children: [
+                // Header
+                _buildAnimatedHeader(colorScheme, authProvider),
 
-            // Quick Actions
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildQuickActionButton(
-                      icon: Icons.add_rounded,
-                      label: 'Create Diary',
-                      color: colorScheme.primary,
-                      onTap: _showCreateDiaryDialog,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildQuickActionButton(
-                      icon: Icons.group_add_rounded,
-                      label: 'Join Diary',
-                      color: colorScheme.secondary,
-                      onTap: _showJoinDiaryDialog,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                // Quick Actions
+                _buildAnimatedQuickActions(colorScheme),
 
-            const SizedBox(height: 8),
+                const SizedBox(height: 8),
 
-            // Diaries List
-            Expanded(
-              child: Consumer<DiaryProvider>(
-                builder: (context, diaryProvider, child) {
-                  if (diaryProvider.diaries.isEmpty) {
-                    return _buildEmptyState(colorScheme);
-                  }
+                // Diaries List
+                Expanded(
+                  child: Consumer<DiaryProvider>(
+                    builder: (context, diaryProvider, child) {
+                      if (diaryProvider.diaries.isEmpty) {
+                        return _buildEmptyState(colorScheme);
+                      }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    itemCount: diaryProvider.diaries.length,
-                    itemBuilder: (context, index) {
-                      final diary = diaryProvider.diaries[index];
-                      return _buildModernDiaryCard(diary, colorScheme);
+                      return _buildAnimatedDiariesList(
+                          diaryProvider, colorScheme);
                     },
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -198,36 +119,41 @@ class _HomeScreenState extends State<HomeScreen> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: color.withOpacity(0.2),
-            width: 1,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: color.withOpacity(0.2),
+              width: 1,
+            ),
           ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: color,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
                 color: color,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+                size: 20,
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -275,7 +201,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildModernDiaryCard(DiaryModel diary, ColorScheme colorScheme) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: colorScheme.surfaceVariant.withOpacity(0.3),
@@ -292,19 +219,41 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (context) => DiaryScreen(diary: diary),
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                    DiaryScreen(diary: diary),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                  const begin = Offset(1.0, 0.0);
+                  const end = Offset.zero;
+                  const curve = Curves.easeOutCubic;
+
+                  var tween = Tween(begin: begin, end: end).chain(
+                    CurveTween(curve: curve),
+                  );
+
+                  return SlideTransition(
+                    position: animation.drive(tween),
+                    child: FadeTransition(
+                      opacity: animation,
+                      child: child,
+                    ),
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 400),
               ),
             );
           },
-          child: Padding(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Container(
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -367,7 +316,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    Container(
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -885,6 +835,186 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAnimatedHeader(
+      ColorScheme colorScheme, AuthProvider authProvider) {
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 600),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(0, 20 * (1 - value)),
+          child: Opacity(
+            opacity: value,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Good ${_getGreeting()}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                                letterSpacing: -0.3,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          authProvider.user?.displayName ?? 'User',
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Profile and theme button
+                  Row(
+                    children: [
+                      Consumer<ThemeProvider>(
+                        builder: (context, themeProvider, child) {
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeInOut,
+                            child: GestureDetector(
+                              onTap: themeProvider.toggleTheme,
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surfaceVariant
+                                      .withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  themeProvider.isDarkMode
+                                      ? Icons.light_mode_rounded
+                                      : Icons.dark_mode_rounded,
+                                  size: 22,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                        child: GestureDetector(
+                          onTap: () {
+                            _showProfileMenu(context);
+                          },
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  colorScheme.primary,
+                                  colorScheme.primary.withOpacity(0.7),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: Text(
+                                (authProvider.user?.displayName ?? 'U')[0]
+                                    .toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAnimatedQuickActions(ColorScheme colorScheme) {
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 800),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(0, 30 * (1 - value)),
+          child: Opacity(
+            opacity: value,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildQuickActionButton(
+                      icon: Icons.add_rounded,
+                      label: 'Create Diary',
+                      color: colorScheme.primary,
+                      onTap: _showCreateDiaryDialog,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildQuickActionButton(
+                      icon: Icons.group_add_rounded,
+                      label: 'Join Diary',
+                      color: colorScheme.secondary,
+                      onTap: _showJoinDiaryDialog,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAnimatedDiariesList(
+      DiaryProvider diaryProvider, ColorScheme colorScheme) {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      itemCount: diaryProvider.diaries.length,
+      itemBuilder: (context, index) {
+        final diary = diaryProvider.diaries[index];
+        return TweenAnimationBuilder<double>(
+          duration: Duration(milliseconds: 400 + (index * 100)),
+          tween: Tween(begin: 0.0, end: 1.0),
+          builder: (context, value, child) {
+            return Transform.translate(
+              offset: Offset(0, 50 * (1 - value)),
+              child: Opacity(
+                opacity: value,
+                child: _buildModernDiaryCard(diary, colorScheme),
+              ),
+            );
+          },
         );
       },
     );

@@ -622,8 +622,28 @@ class _DiaryScreenState extends State<DiaryScreen> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => EntryEditorScreen(diary: widget.diary),
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  EntryEditorScreen(diary: widget.diary),
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                const begin = Offset(1.0, 0.0);
+                const end = Offset.zero;
+                const curve = Curves.easeOutCubic;
+
+                var tween = Tween(begin: begin, end: end).chain(
+                  CurveTween(curve: curve),
+                );
+
+                return SlideTransition(
+                  position: animation.drive(tween),
+                  child: FadeTransition(
+                    opacity: animation,
+                    child: child,
+                  ),
+                );
+              },
+              transitionDuration: const Duration(milliseconds: 400),
             ),
           );
         },

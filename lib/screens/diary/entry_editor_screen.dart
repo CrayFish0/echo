@@ -15,10 +15,15 @@ class EntryEditorScreen extends StatefulWidget {
   State<EntryEditorScreen> createState() => _EntryEditorScreenState();
 }
 
-class _EntryEditorScreenState extends State<EntryEditorScreen> {
+class _EntryEditorScreenState extends State<EntryEditorScreen>
+    with TickerProviderStateMixin {
   final _contentController = TextEditingController();
   final _tagsController = TextEditingController();
   final _scrollController = ScrollController();
+
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   String? _selectedMood;
   bool _isPreviewMode = false;
@@ -75,10 +80,34 @@ class _EntryEditorScreenState extends State<EntryEditorScreen> {
   @override
   void initState() {
     super.initState();
+
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _animationController.forward();
   }
 
   @override
   void dispose() {
+    _animationController.dispose();
     _contentController.dispose();
     _tagsController.dispose();
     _scrollController.dispose();
@@ -144,271 +173,336 @@ class _EntryEditorScreenState extends State<EntryEditorScreen> {
     return Scaffold(
       backgroundColor: colorScheme.surface, // Use theme surface color
       body: SafeArea(
-        child: Column(
-          children: [
-            // Custom Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: BoxDecoration(
-                color: colorScheme.surface, // Use theme surface color
-                // Removed border for seamless look
-              ),
-              child: Row(
-                children: [
-                  // Back button
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
+        child: AnimatedBuilder(
+          animation: _animationController,
+          builder: (context, child) {
+            return FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: Column(
+                  children: [
+                    // Custom Header
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 16),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF2C2C2E)
-                            : const Color(0xFFF2F2F7),
-                        borderRadius: BorderRadius.circular(10),
+                        color: colorScheme.surface, // Use theme surface color
+                        // Removed border for seamless look
                       ),
-                      child: Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 18,
-                        color: isDark ? Colors.white : const Color(0xFF1C1C1E),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-
-                  // Title section
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'New Entry',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color:
-                                isDark ? Colors.white : const Color(0xFF1C1C1E),
-                          ),
-                        ),
-                        Text(
-                          widget.diary.title,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isDark
-                                ? const Color(0xFF8E8E93)
-                                : const Color(0xFF6D6D70),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Save button
-                  Consumer<DiaryProvider>(
-                    builder: (context, diaryProvider, child) {
-                      return GestureDetector(
-                        onTap: diaryProvider.isLoading ? null : _saveEntry,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 10),
-                          decoration: BoxDecoration(
-                            gradient: diaryProvider.isLoading
-                                ? null
-                                : LinearGradient(
-                                    colors: [
-                                      Theme.of(context).colorScheme.primary,
-                                      Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withOpacity(0.8),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                            color: diaryProvider.isLoading
-                                ? (isDark
+                      child: Row(
+                        children: [
+                          // Back button
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: isDark
                                     ? const Color(0xFF2C2C2E)
-                                    : const Color(0xFFE5E5EA))
-                                : null,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: diaryProvider.isLoading
-                                ? null
-                                : [
-                                    BoxShadow(
-                                      color: const Color(0xFF007AFF)
-                                          .withOpacity(0.3),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
+                                    : const Color(0xFFF2F2F7),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.arrow_back_ios_new,
+                                size: 18,
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF1C1C1E),
+                              ),
+                            ),
                           ),
-                          child: diaryProvider.isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Color(0xFF007AFF)),
-                                  ),
-                                )
-                              : Text(
-                                  'Save',
+                          const SizedBox(width: 16),
+
+                          // Title section
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'New Entry',
                                   style: TextStyle(
-                                    color: Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? const Color(0xFF1C1C1E)
-                                        : Colors.white,
-                                    fontSize: 16,
+                                    fontSize: 20,
                                     fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF1C1C1E),
                                   ),
                                 ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Custom Tab Bar
-            Container(
-              margin: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isPreviewMode = false),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          gradient: !_isPreviewMode
-                              ? LinearGradient(
-                                  colors: [
-                                    Theme.of(context).colorScheme.primary,
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withOpacity(0.8),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                              : null,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.edit,
-                              size: 18,
-                              color: !_isPreviewMode
-                                  ? (Theme.of(context).brightness ==
-                                          Brightness.dark
-                                      ? const Color(0xFF1C1C1E)
-                                      : Colors.white)
-                                  : (isDark
-                                      ? const Color(0xFF8E8E93)
-                                      : const Color(0xFF6D6D70)),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Write',
-                              style: TextStyle(
-                                color: !_isPreviewMode
-                                    ? (Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? const Color(0xFF1C1C1E)
-                                        : Colors.white)
-                                    : (isDark
+                                Text(
+                                  widget.diary.title,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDark
                                         ? const Color(0xFF8E8E93)
-                                        : const Color(0xFF6D6D70)),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
+                                        : const Color(0xFF6D6D70),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+
+                          // Save button
+                          Consumer<DiaryProvider>(
+                            builder: (context, diaryProvider, child) {
+                              return TweenAnimationBuilder<double>(
+                                duration: const Duration(milliseconds: 1000),
+                                tween: Tween(begin: 0.0, end: 1.0),
+                                curve: Curves.elasticOut,
+                                builder: (context, animationValue, child) {
+                                  return Transform.scale(
+                                    scale: 0.8 + (0.2 * animationValue),
+                                    child: GestureDetector(
+                                      onTap: diaryProvider.isLoading
+                                          ? null
+                                          : _saveEntry,
+                                      child: AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 200),
+                                        curve: Curves.easeInOut,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 20, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          gradient: diaryProvider.isLoading
+                                              ? null
+                                              : LinearGradient(
+                                                  colors: [
+                                                    Theme.of(context)
+                                                        .colorScheme
+                                                        .primary,
+                                                    Theme.of(context)
+                                                        .colorScheme
+                                                        .primary
+                                                        .withOpacity(0.8),
+                                                  ],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                ),
+                                          color: diaryProvider.isLoading
+                                              ? (isDark
+                                                  ? const Color(0xFF2C2C2E)
+                                                  : const Color(0xFFE5E5EA))
+                                              : null,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          boxShadow: diaryProvider.isLoading
+                                              ? null
+                                              : [
+                                                  BoxShadow(
+                                                    color:
+                                                        const Color(0xFF007AFF)
+                                                            .withOpacity(0.3),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
+                                        ),
+                                        child: diaryProvider.isLoading
+                                            ? const SizedBox(
+                                                height: 20,
+                                                width: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                              Color>(
+                                                          Color(0xFF007AFF)),
+                                                ),
+                                              )
+                                            : Text(
+                                                'Save',
+                                                style: TextStyle(
+                                                  color: Theme.of(context)
+                                                              .brightness ==
+                                                          Brightness.dark
+                                                      ? const Color(0xFF1C1C1E)
+                                                      : Colors.white,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isPreviewMode = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          gradient: _isPreviewMode
-                              ? LinearGradient(
-                                  colors: [
-                                    Theme.of(context).colorScheme.primary,
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withOpacity(0.8),
+
+                    // Custom Tab Bar
+                    Container(
+                      margin: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => _isPreviewMode = false),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  gradient: !_isPreviewMode
+                                      ? LinearGradient(
+                                          colors: [
+                                            Theme.of(context)
+                                                .colorScheme
+                                                .primary,
+                                            Theme.of(context)
+                                                .colorScheme
+                                                .primary
+                                                .withOpacity(0.8),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        )
+                                      : null,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.edit,
+                                      size: 18,
+                                      color: !_isPreviewMode
+                                          ? (Theme.of(context).brightness ==
+                                                  Brightness.dark
+                                              ? const Color(0xFF1C1C1E)
+                                              : Colors.white)
+                                          : (isDark
+                                              ? const Color(0xFF8E8E93)
+                                              : const Color(0xFF6D6D70)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Write',
+                                      style: TextStyle(
+                                        color: !_isPreviewMode
+                                            ? (Theme.of(context).brightness ==
+                                                    Brightness.dark
+                                                ? const Color(0xFF1C1C1E)
+                                                : Colors.white)
+                                            : (isDark
+                                                ? const Color(0xFF8E8E93)
+                                                : const Color(0xFF6D6D70)),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                              : null,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.preview,
-                              size: 18,
-                              color: _isPreviewMode
-                                  ? (Theme.of(context).brightness ==
-                                          Brightness.dark
-                                      ? const Color(0xFF1C1C1E)
-                                      : Colors.white)
-                                  : (isDark
-                                      ? const Color(0xFF8E8E93)
-                                      : const Color(0xFF6D6D70)),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Preview',
-                              style: TextStyle(
-                                color: _isPreviewMode
-                                    ? (Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? const Color(0xFF1C1C1E)
-                                        : Colors.white)
-                                    : (isDark
-                                        ? const Color(0xFF8E8E93)
-                                        : const Color(0xFF6D6D70)),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => _isPreviewMode = true),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  gradient: _isPreviewMode
+                                      ? LinearGradient(
+                                          colors: [
+                                            Theme.of(context)
+                                                .colorScheme
+                                                .primary,
+                                            Theme.of(context)
+                                                .colorScheme
+                                                .primary
+                                                .withOpacity(0.8),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        )
+                                      : null,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.preview,
+                                      size: 18,
+                                      color: _isPreviewMode
+                                          ? (Theme.of(context).brightness ==
+                                                  Brightness.dark
+                                              ? const Color(0xFF1C1C1E)
+                                              : Colors.white)
+                                          : (isDark
+                                              ? const Color(0xFF8E8E93)
+                                              : const Color(0xFF6D6D70)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Preview',
+                                      style: TextStyle(
+                                        color: _isPreviewMode
+                                            ? (Theme.of(context).brightness ==
+                                                    Brightness.dark
+                                                ? const Color(0xFF1C1C1E)
+                                                : Colors.white)
+                                            : (isDark
+                                                ? const Color(0xFF8E8E93)
+                                                : const Color(0xFF6D6D70)),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
 
-            // Content Area
-            Expanded(
-              child: _isPreviewMode ? _buildPreviewTab() : _buildWriteTab(),
-            ),
-          ],
+                    // Content Area
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        switchInCurve: Curves.easeInOut,
+                        switchOutCurve: Curves.easeInOut,
+                        transitionBuilder: (child, animation) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0.3, 0),
+                                end: Offset.zero,
+                              ).animate(animation),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: _isPreviewMode
+                            ? _buildPreviewTab()
+                            : _buildWriteTab(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -537,59 +631,78 @@ class _EntryEditorScreenState extends State<EntryEditorScreen> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _moodOptions.map((moodData) {
+            children: _moodOptions.asMap().entries.map((entry) {
+              final index = entry.key;
+              final moodData = entry.value;
               final moodString = '${moodData['emoji']} ${moodData['mood']}';
               final isSelected = _selectedMood == moodString;
 
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedMood = isSelected ? null : moodString;
-                  });
-                },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                        : (isDark
-                            ? const Color(0xFF2C2C2E)
-                            : const Color(0xFFF2F2F7)),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.primary
-                          : (isDark
-                              ? const Color(0xFF48484A)
-                              : const Color(0xFFD1D1D6)),
-                      width: 1, // Keep consistent border width
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        moodData['emoji']!,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        moodData['mood']!,
-                        style: TextStyle(
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.primary
-                              : (isDark
-                                  ? Colors.white
-                                  : const Color(0xFF1C1C1E)),
-                          fontWeight:
-                              FontWeight.w500, // Keep consistent font weight
-                          fontSize: 14,
+              return TweenAnimationBuilder<double>(
+                duration: Duration(milliseconds: 600 + (index * 100)),
+                tween: Tween(begin: 0.0, end: 1.0),
+                curve: Curves.easeOutBack,
+                builder: (context, animationValue, child) {
+                  return Transform.scale(
+                    scale: animationValue,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedMood = isSelected ? null : moodString;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withOpacity(0.1)
+                                : (isDark
+                                    ? const Color(0xFF2C2C2E)
+                                    : const Color(0xFFF2F2F7)),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : (isDark
+                                      ? const Color(0xFF48484A)
+                                      : const Color(0xFFD1D1D6)),
+                              width: 1, // Keep consistent border width
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                moodData['emoji']!,
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                moodData['mood']!,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.primary
+                                      : (isDark
+                                          ? Colors.white
+                                          : const Color(0xFF1C1C1E)),
+                                  fontWeight: FontWeight
+                                      .w500, // Keep consistent font weight
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               );
             }).toList(),
           ),
