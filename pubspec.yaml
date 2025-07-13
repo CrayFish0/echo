@@ -46,8 +46,8 @@ dependencies:
   # Markdown
   flutter_markdown: ^0.7.4+1
 
-  # Voice to Text
-  speech_to_text: ^7.0.0
+  # Theme persistence
+  shared_preferences: ^2.2.2
 
   # Utilities
   uuid: ^4.5.1

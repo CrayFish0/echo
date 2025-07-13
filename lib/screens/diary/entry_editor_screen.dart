@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../models/diary_model.dart';
 import '../../providers/diary_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 
 class EntryEditorScreen extends StatefulWidget {
   final DiaryModel diary;
@@ -15,37 +15,66 @@ class EntryEditorScreen extends StatefulWidget {
   State<EntryEditorScreen> createState() => _EntryEditorScreenState();
 }
 
-class _EntryEditorScreenState extends State<EntryEditorScreen>
-    with TickerProviderStateMixin {
+class _EntryEditorScreenState extends State<EntryEditorScreen> {
   final _contentController = TextEditingController();
   final _tagsController = TextEditingController();
   final _scrollController = ScrollController();
 
-  late stt.SpeechToText _speech;
-  bool _isListening = false;
-  bool _speechEnabled = false;
-  String? _voiceTranscript;
   String? _selectedMood;
   bool _isPreviewMode = false;
 
-  late TabController _tabController;
-
-  final List<String> _moodOptions = [
-    'Happy',
-    'Sad',
-    'Excited',
-    'Calm',
-    'Grateful',
-    'Angry',
-    'Anxious',
-    'Peaceful'
+  final List<Map<String, String>> _moodOptions = [
+    {
+      'emoji': '😊',
+      'mood': 'Happy',
+      'description': 'Feeling joyful and content'
+    },
+    {'emoji': '😢', 'mood': 'Sad', 'description': 'Feeling down or melancholy'},
+    {
+      'emoji': '😠',
+      'mood': 'Angry',
+      'description': 'Feeling frustrated or upset'
+    },
+    {
+      'emoji': '😴',
+      'mood': 'Tired',
+      'description': 'Feeling exhausted or sleepy'
+    },
+    {
+      'emoji': '😎',
+      'mood': 'Excited',
+      'description': 'Feeling energetic and thrilled'
+    },
+    {
+      'emoji': '🤔',
+      'mood': 'Thoughtful',
+      'description': 'Feeling contemplative'
+    },
+    {
+      'emoji': '😌',
+      'mood': 'Peaceful',
+      'description': 'Feeling calm and relaxed'
+    },
+    {
+      'emoji': '😰',
+      'mood': 'Anxious',
+      'description': 'Feeling worried or nervous'
+    },
+    {
+      'emoji': '😍',
+      'mood': 'Grateful',
+      'description': 'Feeling thankful and blessed'
+    },
+    {
+      'emoji': '🙄',
+      'mood': 'Frustrated',
+      'description': 'Feeling annoyed or irritated'
+    },
   ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _initSpeech();
   }
 
   @override
@@ -53,52 +82,7 @@ class _EntryEditorScreenState extends State<EntryEditorScreen>
     _contentController.dispose();
     _tagsController.dispose();
     _scrollController.dispose();
-    _tabController.dispose();
     super.dispose();
-  }
-
-  void _initSpeech() async {
-    _speech = stt.SpeechToText();
-    _speechEnabled = await _speech.initialize();
-    setState(() {});
-  }
-
-  void _startListening() async {
-    if (_speechEnabled) {
-      setState(() {
-        _isListening = true;
-        _voiceTranscript = '';
-      });
-
-      await _speech.listen(
-        onResult: (result) {
-          setState(() {
-            _voiceTranscript = result.recognizedWords;
-            if (result.finalResult) {
-              _isListening = false;
-              // Add the recognized text to the content
-              final currentText = _contentController.text;
-              final newText = currentText.isEmpty
-                  ? result.recognizedWords
-                  : '$currentText\n\n${result.recognizedWords}';
-              _contentController.text = newText;
-              _contentController.selection = TextSelection.fromPosition(
-                TextPosition(offset: _contentController.text.length),
-              );
-            }
-          });
-        },
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
-      );
-    }
-  }
-
-  void _stopListening() async {
-    await _speech.stop();
-    setState(() {
-      _isListening = false;
-    });
   }
 
   List<String> _parseTags(String tagsText) {
@@ -131,7 +115,6 @@ class _EntryEditorScreenState extends State<EntryEditorScreen>
       createdByName: authProvider.user!.displayName,
       tags: tags,
       mood: _selectedMood,
-      voiceTranscript: _voiceTranscript,
     );
 
     if (success && mounted) {
@@ -154,177 +137,541 @@ class _EntryEditorScreenState extends State<EntryEditorScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('New Entry - ${widget.diary.title}'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(text: 'Write', icon: Icon(Icons.edit)),
-            Tab(text: 'Preview', icon: Icon(Icons.preview)),
-          ],
-        ),
-        actions: [
-          Consumer<DiaryProvider>(
-            builder: (context, diaryProvider, child) {
-              return TextButton(
-                onPressed: diaryProvider.isLoading ? null : _saveEntry,
-                child: diaryProvider.isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Text(
-                        'Save',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildWriteTab(),
-          _buildPreviewTab(),
-        ],
-      ),
-      floatingActionButton: _speechEnabled
-          ? FloatingActionButton(
-              onPressed: _isListening ? _stopListening : _startListening,
-              backgroundColor: _isListening ? Colors.red : Colors.deepPurple,
-              child: Icon(_isListening ? Icons.mic : Icons.mic_none),
-            )
-          : null,
-    );
-  }
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final colorScheme = Theme.of(context).colorScheme;
 
-  Widget _buildWriteTab() {
-    return SingleChildScrollView(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Voice status indicator
-          if (_isListening || _voiceTranscript != null) ...[
+    return Scaffold(
+      backgroundColor: colorScheme.surface, // Use theme surface color
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Custom Header
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
-                color: _isListening ? Colors.red[50] : Colors.blue[50],
-                border: Border.all(
-                  color: _isListening ? Colors.red[200]! : Colors.blue[200]!,
-                ),
-                borderRadius: BorderRadius.circular(8),
+                color: colorScheme.surface, // Use theme surface color
+                // Removed border for seamless look
               ),
               child: Row(
                 children: [
-                  Icon(
-                    _isListening ? Icons.mic : Icons.mic_none,
-                    color: _isListening ? Colors.red[700] : Colors.blue[700],
+                  // Back button
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF2C2C2E)
+                            : const Color(0xFFF2F2F7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.arrow_back_ios_new,
+                        size: 18,
+                        color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 16),
+
+                  // Title section
                   Expanded(
-                    child: Text(
-                      _isListening
-                          ? 'Listening... ${_voiceTranscript ?? ""}'
-                          : 'Voice transcript ready to insert',
-                      style: TextStyle(
-                        color:
-                            _isListening ? Colors.red[700] : Colors.blue[700],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'New Entry',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color:
+                                isDark ? Colors.white : const Color(0xFF1C1C1E),
+                          ),
+                        ),
+                        Text(
+                          widget.diary.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark
+                                ? const Color(0xFF8E8E93)
+                                : const Color(0xFF6D6D70),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Save button
+                  Consumer<DiaryProvider>(
+                    builder: (context, diaryProvider, child) {
+                      return GestureDetector(
+                        onTap: diaryProvider.isLoading ? null : _saveEntry,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 10),
+                          decoration: BoxDecoration(
+                            gradient: diaryProvider.isLoading
+                                ? null
+                                : LinearGradient(
+                                    colors: [
+                                      Theme.of(context).colorScheme.primary,
+                                      Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withOpacity(0.8),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                            color: diaryProvider.isLoading
+                                ? (isDark
+                                    ? const Color(0xFF2C2C2E)
+                                    : const Color(0xFFE5E5EA))
+                                : null,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: diaryProvider.isLoading
+                                ? null
+                                : [
+                                    BoxShadow(
+                                      color: const Color(0xFF007AFF)
+                                          .withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                          ),
+                          child: diaryProvider.isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Color(0xFF007AFF)),
+                                  ),
+                                )
+                              : Text(
+                                  'Save',
+                                  style: TextStyle(
+                                    color: Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFF1C1C1E)
+                                        : Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // Custom Tab Bar
+            Container(
+              margin: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isPreviewMode = false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          gradient: !_isPreviewMode
+                              ? LinearGradient(
+                                  colors: [
+                                    Theme.of(context).colorScheme.primary,
+                                    Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withOpacity(0.8),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : null,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.edit,
+                              size: 18,
+                              color: !_isPreviewMode
+                                  ? (Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? const Color(0xFF1C1C1E)
+                                      : Colors.white)
+                                  : (isDark
+                                      ? const Color(0xFF8E8E93)
+                                      : const Color(0xFF6D6D70)),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Write',
+                              style: TextStyle(
+                                color: !_isPreviewMode
+                                    ? (Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFF1C1C1E)
+                                        : Colors.white)
+                                    : (isDark
+                                        ? const Color(0xFF8E8E93)
+                                        : const Color(0xFF6D6D70)),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isPreviewMode = true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          gradient: _isPreviewMode
+                              ? LinearGradient(
+                                  colors: [
+                                    Theme.of(context).colorScheme.primary,
+                                    Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withOpacity(0.8),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : null,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.preview,
+                              size: 18,
+                              color: _isPreviewMode
+                                  ? (Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? const Color(0xFF1C1C1E)
+                                      : Colors.white)
+                                  : (isDark
+                                      ? const Color(0xFF8E8E93)
+                                      : const Color(0xFF6D6D70)),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Preview',
+                              style: TextStyle(
+                                color: _isPreviewMode
+                                    ? (Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFF1C1C1E)
+                                        : Colors.white)
+                                    : (isDark
+                                        ? const Color(0xFF8E8E93)
+                                        : const Color(0xFF6D6D70)),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+
+            // Content Area
+            Expanded(
+              child: _isPreviewMode ? _buildPreviewTab() : _buildWriteTab(),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWriteTab() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+
+    return SingleChildScrollView(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Content section header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.edit_note,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF1C1C1E)
+                      : Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Your diary entry',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                  color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
 
           // Content field
-          const Text(
-            'Your diary entry:',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 8),
           TextField(
             controller: _contentController,
-            maxLines: 15,
-            decoration: InputDecoration(
-              hintText:
-                  'Write your diary entry here...\n\nYou can use Markdown formatting:\n'
-                  '**bold text**\n*italic text*\n# Heading\n- List item\n\n'
-                  'Use the microphone button to add voice input!',
-              border: const OutlineInputBorder(),
-              alignLabelWithHint: true,
-              contentPadding: const EdgeInsets.all(16),
-            ),
-            style: const TextStyle(height: 1.5),
-          ),
-          const SizedBox(height: 24),
-
-          // Mood selection
-          const Text(
-            'How are you feeling?',
+            maxLines: 12,
             style: TextStyle(
-              fontWeight: FontWeight.bold,
+              height: 1.6,
               fontSize: 16,
+              color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+            ),
+            decoration: InputDecoration(
+              hintText: 'Write your diary entry here...',
+              hintStyle: TextStyle(
+                color:
+                    isDark ? const Color(0xFF8E8E93) : const Color(0xFF6D6D70),
+                fontSize: 16,
+                height: 1.6,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF38383A)
+                      : const Color(0xFFE5E5EA),
+                  width: 1,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF38383A)
+                      : const Color(0xFFE5E5EA),
+                  width: 1,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(
+                  color: Color(0xFF007AFF),
+                  width: 2,
+                ),
+              ),
+              fillColor: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+              filled: true,
+              contentPadding: const EdgeInsets.all(20),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
+
+          // Mood selection header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9500), // Orange color for mood
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.mood,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF1C1C1E)
+                      : Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'How are you feeling?',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                  color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // All moods as tags
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _moodOptions.map((mood) {
-              final isSelected = _selectedMood == mood;
-              return FilterChip(
-                label: Text(mood),
-                selected: isSelected,
-                onSelected: (selected) {
+            children: _moodOptions.map((moodData) {
+              final moodString = '${moodData['emoji']} ${moodData['mood']}';
+              final isSelected = _selectedMood == moodString;
+
+              return GestureDetector(
+                onTap: () {
                   setState(() {
-                    _selectedMood = selected ? mood : null;
+                    _selectedMood = isSelected ? null : moodString;
                   });
                 },
-                selectedColor: Colors.deepPurple[100],
-                checkmarkColor: Colors.deepPurple,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                        : (isDark
+                            ? const Color(0xFF2C2C2E)
+                            : const Color(0xFFF2F2F7)),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : (isDark
+                              ? const Color(0xFF48484A)
+                              : const Color(0xFFD1D1D6)),
+                      width: 1, // Keep consistent border width
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        moodData['emoji']!,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        moodData['mood']!,
+                        style: TextStyle(
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : (isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1C1C1E)),
+                          fontWeight:
+                              FontWeight.w500, // Keep consistent font weight
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               );
             }).toList(),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
+
+          // Tags section header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF20B2AA), // Teal hue of primary blue
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.tag,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF1C1C1E)
+                      : Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Tags',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                  color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
 
           // Tags field
-          const Text(
-            'Tags (separate with commas):',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 8),
           TextField(
             controller: _tagsController,
-            decoration: const InputDecoration(
+            style: TextStyle(
+              fontSize: 16,
+              color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+            ),
+            decoration: InputDecoration(
               hintText: 'family, vacation, birthday, work...',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.tag),
+              hintStyle: TextStyle(
+                color:
+                    isDark ? const Color(0xFF8E8E93) : const Color(0xFF6D6D70),
+                fontSize: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.tag,
+                color:
+                    isDark ? const Color(0xFF8E8E93) : const Color(0xFF6D6D70),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF38383A)
+                      : const Color(0xFFE5E5EA),
+                  width: 1,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF38383A)
+                      : const Color(0xFFE5E5EA),
+                  width: 1,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(
+                  color: Color(0xFF007AFF),
+                  width: 2,
+                ),
+              ),
+              fillColor: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+              filled: true,
+              contentPadding: const EdgeInsets.all(20),
             ),
           ),
           const SizedBox(height: 100), // Extra space for FAB
@@ -334,58 +681,70 @@ class _EntryEditorScreenState extends State<EntryEditorScreen>
   }
 
   Widget _buildPreviewTab() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Preview header
-          Row(
-            children: [
-              const Icon(Icons.preview, color: Colors.deepPurple),
-              const SizedBox(width: 8),
-              Text(
-                'Entry Preview',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.deepPurple,
-                    ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
           // Preview card
-          Card(
-            elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Mock header
-                  Row(
-                    children: [
-                      const CircleAvatar(
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Mock header
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF007AFF), Color(0xFF0051D5)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const CircleAvatar(
                         radius: 16,
-                        backgroundColor: Colors.deepPurple,
+                        backgroundColor: Colors.white,
                         child: Icon(
                           Icons.person,
-                          size: 20,
-                          color: Colors.white,
+                          size: 18,
+                          color: Color(0xFF007AFF),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Column(
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Consumer<AuthProvider>(
                             builder: (context, authProvider, child) {
                               return Text(
                                 authProvider.user?.displayName ?? 'You',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF1C1C1E),
                                 ),
                               );
                             },
@@ -393,119 +752,227 @@ class _EntryEditorScreenState extends State<EntryEditorScreen>
                           Text(
                             'Now',
                             style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 12,
+                              color: isDark
+                                  ? const Color(0xFF8E8E93)
+                                  : const Color(0xFF6D6D70),
+                              fontSize: 14,
                             ),
                           ),
                         ],
                       ),
-                      const Spacer(),
-                      if (_selectedMood != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                    ),
+                    if (_selectedMood != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF9500), Color(0xFFFF6B00)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.deepPurple,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            _selectedMood!,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          _selectedMood!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
 
-                  // Content preview
-                  _contentController.text.trim().isEmpty
-                      ? Text(
+                // Content preview
+                _contentController.text.trim().isEmpty
+                    ? Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF1C1C1E)
+                              : const Color(0xFFF2F2F7),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF38383A)
+                                : const Color(0xFFE5E5EA),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
                           'Your diary entry will appear here...',
                           style: TextStyle(
-                            color: Colors.grey[500],
+                            color: isDark
+                                ? const Color(0xFF8E8E93)
+                                : const Color(0xFF6D6D70),
                             fontStyle: FontStyle.italic,
-                          ),
-                        )
-                      : MarkdownBody(
-                          data: _contentController.text,
-                          styleSheet: MarkdownStyleSheet(
-                            p: const TextStyle(fontSize: 14, height: 1.5),
-                            h1: const TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.bold),
-                            h2: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
-                            h3: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold),
+                            fontSize: 16,
                           ),
                         ),
-
-                  // Voice transcript indicator
-                  if (_voiceTranscript != null &&
-                      _voiceTranscript!.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[50],
-                        border: Border.all(color: Colors.blue[200]!),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.mic, size: 16, color: Colors.blue[700]),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Voice transcription available',
-                            style: TextStyle(
-                              color: Colors.blue[700],
-                              fontSize: 12,
+                      )
+                    : Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF1C1C1E)
+                              : const Color(0xFFF2F2F7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: MarkdownBody(
+                          data: _contentController.text,
+                          styleSheet: MarkdownStyleSheet(
+                            p: TextStyle(
+                              fontSize: 16,
+                              height: 1.6,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1C1C1E),
+                            ),
+                            h1: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1C1C1E),
+                            ),
+                            h2: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1C1C1E),
+                            ),
+                            h3: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1C1C1E),
+                            ),
+                            strong: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1C1C1E),
+                            ),
+                            em: TextStyle(
+                              fontStyle: FontStyle.italic,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1C1C1E),
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
 
-                  // Tags preview
-                  if (_tagsController.text.trim().isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: _parseTags(_tagsController.text).map((tag) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                // Tags preview
+                if (_tagsController.text.trim().isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _parseTags(_tagsController.text).map((tag) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF34C759), Color(0xFF248A3D)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.deepPurple[50],
-                            border: Border.all(color: Colors.deepPurple[200]!),
-                            borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          '#$tag',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
-                          child: Text(
-                            '#$tag',
-                            style: TextStyle(
-                              color: Colors.deepPurple[700],
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
+          const SizedBox(height: 100), // Extra space for FAB
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickMoodButton(Map<String, String> moodData, bool isDark) {
+    final moodString = '${moodData['emoji']} ${moodData['mood']}';
+    final isSelected = _selectedMood == moodString;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedMood = isSelected ? null : moodString;
+        });
+      },
+      child: Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary
+              : (isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : (isDark ? const Color(0xFF48484A) : const Color(0xFFD1D1D6)),
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color:
+                        Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              moodData['emoji']!,
+              style: TextStyle(
+                fontSize: isSelected ? 24 : 20,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              moodData['mood']!,
+              style: TextStyle(
+                color: isSelected
+                    ? (Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF1C1C1E)
+                        : Colors.white)
+                    : (isDark ? Colors.white : const Color(0xFF1C1C1E)),
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                fontSize: 10,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
